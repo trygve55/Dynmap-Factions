@@ -48,7 +48,7 @@ import com.massivecraft.massivecore.ps.PS;
 
 public class DynmapFactionsPlugin extends JavaPlugin {
     private static Logger log;
-    private static final String DEF_INFOWINDOW = "<div class=\"infowindow\"><span style=\"font-size:120%;\">%regionname%</span><br />Flags<br /><span style=\"font-weight:bold;\">%flags%</span></div>";
+    private static final String DEF_INFOWINDOW = "<div class=\"infowindow\"><span style=\"font-size:200%;font-weight:bold;\">%regionname%</span><span style=\"font-size:120%;font-weight:bold;\">%description%</span><br/><span style=\"font-weight:bold;\">%playerowners%%playerownerstitle%%landsize%%memberscount%</span>%playermembers%</div>";
     Plugin dynmap;
     DynmapAPI api;
     MarkerAPI markerapi;
@@ -116,6 +116,55 @@ public class DynmapFactionsPlugin extends JavaPlugin {
                 }
             }
             boost = cfg.getBoolean(path+".boost", false);
+        }
+
+        AreaStyle(Faction fact) {
+            /*
+            strokecolor = def.strokecolor;
+            strokeopacity = def.strokeopacity;
+            strokeweight = def.strokeweight;
+            fillcolor =  def.fillcolor;
+            fillopacity = def.fillopacity;
+            homemarker = def.homemarker;
+            */
+            strokecolor = "#FF0000";
+            strokeopacity = 0.8;
+            strokeweight = 3;
+            fillcolor =  "#FF0000";
+            fillopacity = 0.35;
+            homemarker = null;
+
+            if(homemarker != null) {
+                homeicon = markerapi.getMarkerIcon(homemarker);
+                if(homeicon == null) {
+                    severe("Invalid homeicon: " + homemarker);
+                    homeicon = markerapi.getMarkerIcon("blueicon");
+                }
+            }
+            boost = false; //cfg.getBoolean(path+".boost", def.boost);
+
+            String color = ChatColor.getLastColors(fact.getName());
+            if (!color.equals("")) {
+                if (color.equals(ChatColor.BLACK)) color = "#000000";
+                else if (color.equals(ChatColor.DARK_BLUE)) color = "#0000AA";
+                else if (color.equals(ChatColor.DARK_GREEN)) color = "#00AA00";
+                else if (color.equals(ChatColor.DARK_AQUA)) color = "#00AAAA";
+                else if (color.equals(ChatColor.DARK_RED)) color = "#AA0000";
+                else if (color.equals(ChatColor.DARK_PURPLE)) color = "#AA00AA";
+                else if (color.equals(ChatColor.GOLD)) color = "#FFAA00";
+                else if (color.equals(ChatColor.GRAY)) color = "#AAAAAA";
+                else if (color.equals(ChatColor.DARK_GRAY)) color = "#555555";
+                else if (color.equals(ChatColor.BLUE)) color = "#5555FF";
+                else if (color.equals(ChatColor.GREEN)) color = "#55FF55";
+                else if (color.equals(ChatColor.AQUA)) color = "#55FFFF";
+                else if (color.equals(ChatColor.RED)) color = "#FF5555";
+                else if (color.equals(ChatColor.LIGHT_PURPLE)) color = "#FF55FF";
+                else if (color.equals(ChatColor.YELLOW)) color = "#FFFF55";
+                else if (color.equals(ChatColor.WHITE)) color = "#FFFFFF";
+
+                strokecolor = color;
+                fillcolor = color;
+            }
         }
     }
     
@@ -204,16 +253,23 @@ public class DynmapFactionsPlugin extends JavaPlugin {
     private String formatInfoWindow(Faction fact) {
         String v = "<div class=\"regioninfo\">"+infowindow+"</div>";
         v = v.replace("%regionname%", ChatColor.stripColor(fact.getName()));
-        v = v.replace("%description%", ChatColor.stripColor(fact.getDescription()));
+        v = v.replace("%description%", ((!fact.getDescription().contains("no description set")) ? "<br/>" + ChatColor.stripColor(fact.getDescription())  : ""));
         MPlayer adm = fact.getLeader();
-        v = v.replace("%playerowners%", (adm!=null)?adm.getName():"");
+        v = v.replace("%playerowners%", (adm!=null)? "<br/>Leader: " + adm.getName():"");
+        String title = (adm!=null) ? adm.getTitle() : null;
+        v = v.replace("%playerownerstitle%", (title!=null && !title.contains("no title set")) ? " (" + title + ")" : "");
+        int membersCount = fact.getMPlayers().size();
+        v = v.replace("%memberscount%", (membersCount != 0 && !fact.getFlag(MFlag.getFlagPermanent())) ? "<br/>Members: " + membersCount : "");
+        v = v.replace("%landsize%", ((!fact.getFlag(MFlag.getFlagPermanent())) ? "<br/>Size: " + fact.getLandCount()*256 + " blocks": ""));
+
         String res = "";
         for(MPlayer r : fact.getMPlayers()) {
         	if(res.length()>0) res += ", ";
-        	res += r.getName();
+        	title = (!(r.getTitle().contains("no title set")) ? " (" + r.getTitle() + ")" : "");
+        	res += "<br/>&emsp;" + r.getName() + title;
         }
         v = v.replace("%playermembers%", res);
-        
+
         v = v.replace("%nation%", ChatColor.stripColor(fact.getName()));
         /* Build flags */
         String flgs = "";
@@ -221,6 +277,17 @@ public class DynmapFactionsPlugin extends JavaPlugin {
             flgs += "<br/>" + ff.getName() + ": " + fact.getFlag(ff);
             v = v.replace("%flag." + ff.getName() + "%", fact.getFlag(ff)?"true":"false");
         }
+
+        /*
+        if (!fact.getDescription().contains("no description set")) flgs += "<br/>" + fact.getDescription();
+        if (!fact.getFlag(MFlag.getFlagPermanent())) {
+            flgs += "<br/>Leader: " + fact.getLeader().getName();
+            if (!fact.getLeader().getTitle().contains("no title set")) flgs += " (" + fact.getLeader().getTitle() + ")";
+            flgs += "<br/>Members: " + fact.getMPlayers().size();
+            flgs += "<br/>Size: " + fact.getLandCount()*256 + " blocks";
+        }
+        */
+
         v = v.replace("%flags%", flgs);
         return v;
     }
@@ -497,6 +564,14 @@ public class DynmapFactionsPlugin extends JavaPlugin {
             }
             /* Loop through factions */
             for(Faction fact : facts) {
+                if (!ChatColor.getLastColors(fact.getName()).equals("")) {
+                    String id = ChatColor.stripColor(fact.getName());
+                    cusstyle.remove(id);
+                    cusstyle.put(id, new AreaStyle(fact));
+                }
+            }
+
+            for(Faction fact : facts) {
                 String factname = ChatColor.stripColor(fact.getName());
                 String fid = fc.getUniverse() + "_" + fact.getId();
                 FactionBlocks factblocks = blocks_by_faction.get(fid); /* Look up faction */
@@ -699,6 +774,7 @@ public class DynmapFactionsPlugin extends JavaPlugin {
         defstyle = new AreaStyle(cfg, "regionstyle");
         cusstyle = new HashMap<String, AreaStyle>();
         ConfigurationSection sect = cfg.getConfigurationSection("custstyle");
+
         if(sect != null) {
             Set<String> ids = sect.getKeys(false);
             
