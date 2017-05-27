@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.massivecraft.factions.Rel;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -48,7 +49,7 @@ import com.massivecraft.massivecore.ps.PS;
 
 public class DynmapFactionsPlugin extends JavaPlugin {
     private static Logger log;
-    private static final String DEF_INFOWINDOW = "<div class=\"infowindow\"><span style=\"font-size:200%;font-weight:bold;\">%regionname%</span><span style=\"font-size:120%;font-weight:bold;\">%description%</span><br/><span style=\"font-weight:bold;\">%playerowners%%playerownerstitle%%landsize%%memberscount%</span>%playermembers%</div>";
+    private static final String DEF_INFOWINDOW = "<div class=\"infowindow\"><span style=\"font-size:200%;font-weight:bold;\">%regionname%</span><span style=\"font-size:120%;font-weight:bold;\">%description%</span><br/><span style=\"font-weight:bold;\">%playerowners%%playerownerstitle%%landsize%%memberscount%%relations%</span>%playermembers%</div>";
     Plugin dynmap;
     DynmapAPI api;
     MarkerAPI markerapi;
@@ -261,7 +262,9 @@ public class DynmapFactionsPlugin extends JavaPlugin {
         int membersCount = fact.getMPlayers().size();
         v = v.replace("%memberscount%", (membersCount != 0 && !fact.getFlag(MFlag.getFlagPermanent())) ? "<br/>Members: " + membersCount : "");
         v = v.replace("%landsize%", ((!fact.getFlag(MFlag.getFlagPermanent())) ? "<br/>Size: " + fact.getLandCount()*256 + " blocks": ""));
+        v = v.replace("%nation%", ChatColor.stripColor(fact.getName()));
 
+        /* Build players */
         String res = "";
         for(MPlayer r : fact.getMPlayers()) {
         	if(res.length()>0) res += ", ";
@@ -270,7 +273,6 @@ public class DynmapFactionsPlugin extends JavaPlugin {
         }
         v = v.replace("%playermembers%", res);
 
-        v = v.replace("%nation%", ChatColor.stripColor(fact.getName()));
         /* Build flags */
         String flgs = "";
         for(MFlag ff : MFlagColl.get().getAll()) {
@@ -278,17 +280,24 @@ public class DynmapFactionsPlugin extends JavaPlugin {
             v = v.replace("%flag." + ff.getName() + "%", fact.getFlag(ff)?"true":"false");
         }
 
-        /*
-        if (!fact.getDescription().contains("no description set")) flgs += "<br/>" + fact.getDescription();
-        if (!fact.getFlag(MFlag.getFlagPermanent())) {
-            flgs += "<br/>Leader: " + fact.getLeader().getName();
-            if (!fact.getLeader().getTitle().contains("no title set")) flgs += " (" + fact.getLeader().getTitle() + ")";
-            flgs += "<br/>Members: " + fact.getMPlayers().size();
-            flgs += "<br/>Size: " + fact.getLandCount()*256 + " blocks";
+        /* Build relations */
+        String relations = "";
+        if (!fact.getFlag("permanent")) {
+            for (Faction faction : FactionColl.get().getAll()) {
+                Rel rel = fact.getRelationTo(faction);
+                String fName = faction.getName();
+                if (!rel.getDescFactionOne().equals("a neutral faction") && !rel.getDescFactionOne().equals("your faction") && !faction.getFlag("permanent")) {
+                    if (relations.length() > 0) {
+                        relations += ", ";
+                    } else {
+                        relations += "<span style=\"font-weight:bold;\"><br/>Relations: </span>";
+                    }
+                    relations += "<br/>&emsp;" + fName + " (" + rel.getDescFactionOne() + ")";
+                }
+            }
         }
-        */
+        v = v.replace("%relations%", relations);
 
-        v = v.replace("%flags%", flgs);
         return v;
     }
     

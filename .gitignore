@@ -26,6 +26,5 @@
 
 #intellij
 /.idea
-/out
 /target
 *iml
